@@ -1,10 +1,14 @@
-# Astrocrash02
-# Rotating the ship
+# Astrocrash03
+# Engage engine, velocity
 
-import random
+
 from livewires import games
+import random
+import math
+
 
 games.init(screen_width = 780,  screen_height = 480, fps = 50)
+
 
 class Asteroid(games.Sprite):
     ''' An asteroid which floats across the screen. '''
@@ -46,6 +50,8 @@ class Ship(games.Sprite):
     ''' The player's ship. '''
     image = games.load_image('ship.jpg')
     ROTATION_STEP = 3
+    VELOCITY_STEP = .03
+    sound = games.load_sound('thrust.wav')
 
     def update(self):
         ''' Rotate based on keys pressed. '''
@@ -53,6 +59,28 @@ class Ship(games.Sprite):
             self.angle -= Ship.ROTATION_STEP
         if games.keyboard.is_pressed(games.K_RIGHT):
             self.angle += Ship.ROTATION_STEP
+
+        # apply thrust based on the up arrow key
+        if games.keyboard.is_pressed(games.K_UP):
+            Ship.sound.play()
+
+            #change velocity components based on ship's angle
+            angle = self.angle * math.pi / 180 # convert to radians
+            self.dx += Ship.VELOCITY_STEP * math.sin(angle)
+            self.dy += Ship.VELOCITY_STEP * -math.cos(angle)
+
+        # wrap the ship around screen
+        if self.top > games.screen.height:
+            self.bottom = 0
+
+        if self.bottom < 0:
+            self.top = games.screen.height
+
+        if self.left > games.screen.width:
+            self.right = 0
+
+        if self.right < 0:
+            self.left = games.screen.width
 
 
 def main():
@@ -79,6 +107,3 @@ def main():
 
 # Do It!
 main()
-
-
-
