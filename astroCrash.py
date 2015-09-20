@@ -1,5 +1,5 @@
-# Astrocrash05
-# Controlling missile fire rate
+# Astrocrash06
+# Handling collisions
 
 
 from livewires import games
@@ -20,6 +20,7 @@ class Asteroid(games.Sprite):
               LARGE : games.load_image('asteroid_large.jpg') }
 
     SPEED = 2
+    SPAWN = 2
 
     def __init__(self, x, y, size):
         ''' Initialize asteroid sprite. '''
@@ -44,6 +45,17 @@ class Asteroid(games.Sprite):
 
         if self.right < 0:
             self.left = games.screen.width
+
+    def die(self):
+        ''' Destroy asteroid. '''
+        # if asteroid isn't small, replace with two smaller asteroids
+        if self.size != Asteroid.SMALL:
+            for i in range (Asteroid.SPAWN):
+                new_asteroid = Asteroid(x = self.x,
+                                        y = self.y,
+                                        size = self.size - 1)
+                games.screen.add(new_asteroid)
+        self.destroy()
 
 
 class Ship(games.Sprite):
@@ -98,6 +110,16 @@ class Ship(games.Sprite):
             games.screen.add(new_missile)
             self.missile_wait = Ship.MISSILE_DELAY
 
+        # check if ship overlaps any other object
+        if self.overlapping_sprites:
+            for sprite in self.overlapping_sprites:
+                sprite.die()
+            self.die()
+
+    def die(self):
+        ''' Destroy ship. '''
+        self.destroy()
+
 
 class Missile(games.Sprite):
     ''' A missile launched by the player's ship. '''
@@ -149,6 +171,16 @@ class Missile(games.Sprite):
 
         if self.right < 0:
             self.left = games.screen.width
+
+        # check if missile overlaps any other object
+        if self.overlapping_sprites:
+            for sprite in self.overlapping_sprites:
+                sprite.die()
+            self.die()
+
+    def die(self):
+        ''' Destroy the missile. '''
+        self.destroy()
 
 
 def main():
