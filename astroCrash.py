@@ -1,5 +1,6 @@
-# Astrocrash06
-# Handling collisions
+# Astrocrash07
+# Adding Explosions!
+# -and clean up code redundancies
 
 
 from livewires import games
@@ -10,7 +11,47 @@ import math
 games.init(screen_width = 780,  screen_height = 480, fps = 50)
 
 
-class Asteroid(games.Sprite):
+# instead of function to call, made class so all others simply inherit wrap!
+class Wrapper(games.Sprite):
+    ''' A sprite that wraps around the screen. '''
+    def update(self):
+        ''' wrap sprite around screen. '''
+        if self.top > games.screen.height:
+            self.bottom = 0
+
+        if self.bottom < 0:
+            self.top = games.screen.height
+
+        if self.left > games.screen.width:
+            self.right = 0
+
+        if self.right < 0:
+            self.left = games.screen.width
+
+    def die(self):
+        ''' Destroy self. '''
+        self.destroy()
+
+
+class Collider(Wrapper):
+    ''' A wrapper that can collide with another object. '''
+    def update(self):
+        ''' Check for oberlapping sprites. '''
+        super(Collider, self).update()
+
+        if self.overlapping_sprites:
+            for sprite in self.overlapping_sprites:
+                sprite.die()
+            self.die()
+
+    def die(self):
+        ''' Destroy self and leave explosion behind. '''
+        new_explosion = Explosion(x = self.x, y = self.y)
+        games.screen.add(new_explosion)
+        self.destroy()
+
+        
+class Asteroid(Wrapper):
     ''' An asteroid which floats across the screen. '''
     SMALL = 1
     MEDIUM = 2
@@ -32,20 +73,6 @@ class Asteroid(games.Sprite):
 
         self.size = size
 
-    def update(self):
-        ''' Wrap around screen. '''
-        if self.top > games.screen.height:
-            self.bottom = 0
-
-        if self.bottom < 0:
-            self.top == games.screen.height
-
-        if self.left > games.screen.width:
-            self.right = 0
-
-        if self.right < 0:
-            self.left = games.screen.width
-
     def die(self):
         ''' Destroy asteroid. '''
         # if asteroid isn't small, replace with two smaller asteroids
@@ -55,10 +82,10 @@ class Asteroid(games.Sprite):
                                         y = self.y,
                                         size = self.size - 1)
                 games.screen.add(new_asteroid)
-        self.destroy()
+        super(Asteroid, self).die() #inherits from Wrapper
 
 
-class Ship(games.Sprite):
+class Ship(Collider):
     ''' The player's ship. '''
     image = games.load_image('ship.jpg')
     ROTATION_STEP = 3
@@ -87,19 +114,6 @@ class Ship(games.Sprite):
             self.dx += Ship.VELOCITY_STEP * math.sin(angle)
             self.dy += Ship.VELOCITY_STEP * -math.cos(angle)
 
-        # wrap the ship around screen
-        if self.top > games.screen.height:
-            self.bottom = 0
-
-        if self.bottom < 0:
-            self.top = games.screen.height
-
-        if self.left > games.screen.width:
-            self.right = 0
-
-        if self.right < 0:
-            self.left = games.screen.width
-
         # if waiting until the ship can fire next, decrease wait
         if self.missile_wait > 0:
             self.missile_wait -= 1
@@ -110,22 +124,15 @@ class Ship(games.Sprite):
             games.screen.add(new_missile)
             self.missile_wait = Ship.MISSILE_DELAY
 
-        # check if ship overlaps any other object
-        if self.overlapping_sprites:
-            for sprite in self.overlapping_sprites:
-                sprite.die()
-            self.die()
-
-    def die(self):
-        ''' Destroy ship. '''
-        self.destroy()
+        # replaces wrap, collision and die code (now inhereted from Collider)
+        super(Ship, self).update()
 
 
-class Missile(games.Sprite):
+class Missile(Collider):
     ''' A missile launched by the player's ship. '''
     image = games.load_image('missile.jpg')
     sound = games.load_sound('missile.wav')
-    BUFFER = 40
+    BUFFER = 80 #40 i needed larger, else inside ship = blow me up
     VELOCITY_FACTOR = 7
     LIFETIME = 40
 
@@ -159,29 +166,30 @@ class Missile(games.Sprite):
         if self.lifetime == 0:
             self.destroy()
 
-        # wrap the missile around screen
-        if self.top > games.screen.height:
-            self.bottom = 0
+        # repalces wrap, collision & die code (inherited from Collider)
+        super(Missile, self).update()
 
-        if self.bottom < 0:
-            self.top = games.screen.height
 
-        if self.left > games.screen.width:
-            self.right = 0
+class Explosion(games.Animation):
+    ''' Explosion animation. '''
+    sound = games.load_sound('explosion.wav')
+    images = ['explosion_01.jpg',
+              'explosion_02.jpg',
+              'explosion_03.jpg',
+              'explosion_04.jpg',
+              'explosion_05.jpg',
+              'explosion_06.jpg',
+              'explosion_07.jpg',
+              'explosion_08.jpg',
+              'explosion_09.jpg',]
 
-        if self.right < 0:
-            self.left = games.screen.width
-
-        # check if missile overlaps any other object
-        if self.overlapping_sprites:
-            for sprite in self.overlapping_sprites:
-                sprite.die()
-            self.die()
-
-    def die(self):
-        ''' Destroy the missile. '''
-        self.destroy()
-
+    def __init__(self, x, y):
+        super(Explosion, self).__init__(images = Explosion.images,
+                                        x = x, y = y,
+                                        repeat_interval = 4, n_repeats = 1,
+                                        is_collideable = False)
+        Explosion.sound.play()
+        
 
 def main():
     # establish background
