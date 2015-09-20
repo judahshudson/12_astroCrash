@@ -1,9 +1,14 @@
-# Astrocrash07
-# Adding Explosions!
-# -and clean up code redundancies
+# Astrocrash08
+# Levels, scorekeeping, music, cleanup for final version
+
+# CLEANUP, DEBUG
+##-trim jpgs (so object size = visible part, not huge transparent border)
+##-sound balance
+##-ship still blows up at game open (spawn into asteroids?)
 
 
-from livewires import games
+
+from livewires import games, color
 import random
 import math
 
@@ -62,8 +67,10 @@ class Asteroid(Wrapper):
 
     SPEED = 2
     SPAWN = 2
+    POINTS = 30
+    total = 0
 
-    def __init__(self, x, y, size):
+    def __init__(self, game, x, y, size):
         ''' Initialize asteroid sprite. '''
         super(Asteroid, self).__init__(
             image = Asteroid.images[size],
@@ -72,17 +79,30 @@ class Asteroid(Wrapper):
             dy = random.choice([1, -1]) * Asteroid.SPEED * random.random()/size)
 
         self.size = size
+        self.game = game
+
+        Asteroid.total += 1
 
     def die(self):
         ''' Destroy asteroid. '''
         # if asteroid isn't small, replace with two smaller asteroids
         if self.size != Asteroid.SMALL:
             for i in range (Asteroid.SPAWN):
-                new_asteroid = Asteroid(x = self.x,
+                new_asteroid = Asteroid(game = self.game,
+                                        x = self.x,
                                         y = self.y,
                                         size = self.size - 1)
                 games.screen.add(new_asteroid)
         super(Asteroid, self).die() #inherits from Wrapper
+
+        Asteroid.total -= 1
+
+        self.game.score.value += int(Asteroid.POINTS / self.size)
+        self.game.score.right = games.screen.width - 10
+
+        # if all asteroids are gone, advance to next level
+        if Asteroid.total == 0:
+            self.game.advance()
 
 
 class Ship(Collider):
@@ -90,13 +110,16 @@ class Ship(Collider):
     image = games.load_image('ship.jpg')
     ROTATION_STEP = 3
     VELOCITY_STEP = .03
+    VELOCITY_MAX = 3
     MISSILE_DELAY = 25
-    sound = games.load_sound('thrust.wav')
+    sound = games.load_sound('thrust_quiet.wav')
+    
 
-    def __init__(self, x, y):
+    def __init__(self, game, x, y):
         ''' Initialize ship sprite. '''
         super(Ship, self).__init__(image = Ship.image, x = x, y = y)
         self.missile_wait = 0
+        self.game = game
 
     def update(self):
         ''' Rotate based on keys pressed. '''
@@ -127,12 +150,21 @@ class Ship(Collider):
         # replaces wrap, collision and die code (now inhereted from Collider)
         super(Ship, self).update()
 
+        # cap velocity in each direction
+        self.dx = min(max(self.dx, -Ship.VELOCITY_MAX), Ship.VELOCITY_MAX)
+        self.dy = min(max(self.dy, -Ship.VELOCITY_MAX), Ship.VELOCITY_MAX)
+
+    def die(self):
+        ''' Destroy ship and end the game. '''
+        self.game.end()
+        super(Ship, self).die()
+
 
 class Missile(Collider):
     ''' A missile launched by the player's ship. '''
     image = games.load_image('missile.jpg')
     sound = games.load_sound('missile.wav')
-    BUFFER = 80 #40 i needed larger, else inside ship = blow me up
+    BUFFER = 140 #40 i needed larger, else inside ship = blow me up
     VELOCITY_FACTOR = 7
     LIFETIME = 40
 
@@ -191,26 +223,131 @@ class Explosion(games.Animation):
         Explosion.sound.play()
         
 
+class Game(object):
+    ''' The game itself. '''
+    def __init__(self):
+        ''' Initialize Game object. '''
+        # set level
+        self.level = 0
+
+        # load sound for level advance
+        self.sound = games.load_sound('level.wav')
+
+        # create score
+        self.score = games.Text(value = 0,
+                                size = 30,
+                                color = color.white,
+                                top = 5,
+                                right = games.screen.width - 10,
+                                is_collideable = False)
+        games.screen.add(self.score)
+
+        # create player's ship
+        self.ship = Ship(game = self,
+                         x = games.screen.width/2,
+                         y = games.screen.height/2)
+        games.screen.add(self.ship)
+
+    def play(self):
+        ''' Play the game. '''
+        # begin theme music
+        games.music.load('theme.mp3')
+        games.music.play(-1)
+
+        # load and set as background
+        nebula_image = games.load_image('nebula.jpg')
+        games.screen.background = nebula_image
+
+        # advance to level one
+        self.advance()
+
+        # start play
+        games.screen.mainloop()
+
+    def advance(self):
+        ''' Advance to the next game level. '''
+        self.level += 1
+
+        # amount of space around ship to preserve when creating asteroids
+        BUFFER = 150
+
+        # create new asteroids
+        for i in range(self.level):
+            # calcualte an x and y at least BUFFER distance from the ship
+
+            #choose minimum distance along x-axis and y-axis
+            x_min = random.randrange(BUFFER)
+            y_min = BUFFER - x_min
+
+            # vhoose distance along x-axis and y-axis based on minimum distance
+            x_distance = random.randrange(x_min, games.screen.width - x_min)
+            y_distance = random.randrange(y_min, games.screen.height - y_min)
+
+            # calculate location based on distance
+            x = self.ship.x + x_distance
+            y = self.ship.y + y_distance
+
+            # wrap around screen, if necessary
+            x %= games.screen.width
+            y %= games.screen.height
+
+            # create the asteroid
+            new_asteroid = Asteroid(game = self,
+                                    x = x, y = y,
+                                    size = Asteroid.LARGE)
+            games.screen.add(new_asteroid)
+
+        # display level number
+        level_message = games.Message(value = 'Level' + str(self.level),
+                                      size = 40,
+                                      color = color.yellow,
+                                      x = games.screen.width/2,
+                                      y = games.screen.height/2,
+                                      lifetime = 3 * games.screen.fps,
+                                      is_collideable = False)
+        games.screen.add(level_message)
+
+        # play new level sound (except at first level)
+        if self.level > 1:
+            self.sound.play()
+
+    def end(self):
+        ''' End the game. '''
+        # Show 'Game Over' for 5 seconds
+        end_message = games.Message(value = 'Game Over',
+                                    size = 90,
+                                    color = color.red,
+                                    x = games.screen.width/2,
+                                    y = games.screen.width/2,
+                                    lifetime = 5 * games.screen.fps,
+                                    after_death = games.screen.quit,
+                                    is_collideable = False)
+        games.screen.add(end_message)
+
+    
 def main():
-    # establish background
-    nebula_image = games.load_image('nebula.jpg')
-    games.screen.background = nebula_image
+    astrocrash = Game()
+    astrocrash.play()
 
-    # create 8 asteroids
-    for i in range(8):
-        x = random.randrange(games.screen.width)
-        y = random.randrange(games.screen.height)
-        size = random.choice([Asteroid.SMALL, Asteroid.MEDIUM, Asteroid.LARGE])
-        new_asteroid = Asteroid(x = x, y = y, size = size)
-        games.screen.add(new_asteroid)
 
-    # create the ship
-    the_ship = Ship(#image = Ship.image, #commented out to fix error from 05 updates (unexpected keyword argument)
-                    x = games.screen.width/2,
-                    y = games.screen.height/2)
-    games.screen.add(the_ship)
-
-    games.screen.mainloop()
+##    # establish background
+##
+##
+##    # create 8 asteroids
+##    for i in range(8):
+##        x = random.randrange(games.screen.width)
+##        y = random.randrange(games.screen.height)
+##        size = random.choice([Asteroid.SMALL, Asteroid.MEDIUM, Asteroid.LARGE])
+##        new_asteroid = Asteroid(x = x, y = y, size = size)
+##        games.screen.add(new_asteroid)
+##
+##    # create the ship
+##    the_ship = Ship(#image = Ship.image, #commented out to fix error from 05 updates (unexpected keyword argument)
+##                    x = games.screen.width/2,
+##                    y = games.screen.height/2)
+##    games.screen.add(the_ship)
+##
+##    games.screen.mainloop()
 
 
 # 'Stew It!
