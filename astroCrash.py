@@ -1,5 +1,5 @@
-# Astrocrash04
-# Fire missiles
+# Astrocrash05
+# Controlling missile fire rate
 
 
 from livewires import games
@@ -51,7 +51,13 @@ class Ship(games.Sprite):
     image = games.load_image('ship.jpg')
     ROTATION_STEP = 3
     VELOCITY_STEP = .03
+    MISSILE_DELAY = 25
     sound = games.load_sound('thrust.wav')
+
+    def __init__(self, x, y):
+        ''' Initialize ship sprite. '''
+        super(Ship, self).__init__(image = Ship.image, x = x, y = y)
+        self.missile_wait = 0
 
     def update(self):
         ''' Rotate based on keys pressed. '''
@@ -82,10 +88,16 @@ class Ship(games.Sprite):
         if self.right < 0:
             self.left = games.screen.width
 
-        # fire missile if spacebar is pressed
-        if games.keyboard.is_pressed(games.K_SPACE):
+        # if waiting until the ship can fire next, decrease wait
+        if self.missile_wait > 0:
+            self.missile_wait -= 1
+
+        # fire missile if spacebar is pressed and missile wait is over
+        if games.keyboard.is_pressed(games.K_SPACE)and self.missile_wait == 0:
             new_missile = Missile(self.x, self.y, self.angle)
             games.screen.add(new_missile)
+            self.missile_wait = Ship.MISSILE_DELAY
+
 
 class Missile(games.Sprite):
     ''' A missile launched by the player's ship. '''
@@ -153,9 +165,9 @@ def main():
         games.screen.add(new_asteroid)
 
     # create the ship
-    the_ship = Ship(image = Ship.image,
-                    x = games.screen.width / 2,
-                    y = games.screen.height / 2)
+    the_ship = Ship(#image = Ship.image, #commented out to fix error from 05 updates (unexpected keyword argument)
+                    x = games.screen.width/2,
+                    y = games.screen.height/2)
     games.screen.add(the_ship)
 
     games.screen.mainloop()
