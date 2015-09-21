@@ -1,11 +1,13 @@
-# Astrocrash08
-# Levels, scorekeeping, music, cleanup for final version
+# Challenge 1
+# Add debris (Aliens!)
 
-# CLEANUP, DEBUG
-##-trim jpgs (so object size = visible part, not huge transparent border)
-##-sound balance
-##-ship still blows up at game open (spawn into asteroids?)
-
+##Improve:
+##    -change alien direction, movement style (track, avoid?)
+##    -allow alien to fire
+##    -progression (harder as game advances)
+##    -add sound fx
+##    -consolidate Game.play() / add new alien code w/ add new asteroid overlap
+##    -fix: asteroid overlaps covers score
 
 
 from livewires import games, color
@@ -55,6 +57,35 @@ class Collider(Wrapper):
         games.screen.add(new_explosion)
         self.destroy()
 
+
+##PSUEDO CODE
+##-fast
+##-appear occasionally
+##-shoot lazers?
+        
+class Alien(Wrapper):
+    ''' A hostile alien ship '''
+
+    image = games.load_image('alien.jpg')
+    SPEED = 2
+    POINTS = 100
+
+    def __init__(self, game, x, y):
+        ''' Initialize alien sprite. '''
+        super(Alien, self).__init__(
+            image = Alien.image,
+            x = x, y = y,
+            dx = random.choice([1, -1]) * Alien.SPEED,
+            dy = random.choice([1, -1]) * Alien.SPEED)
+        self.game = game
+
+    def die(self):
+        ''' Destroy alien. '''
+        super(Alien, self).die() #inherits from Wrapper
+
+        self.game.score.value += int(Alien.POINTS)
+        self.game.score.right = games.screen.width - 10
+        
         
 class Asteroid(Wrapper):
     ''' An asteroid which floats across the screen. '''
@@ -296,6 +327,34 @@ class Game(object):
                                     x = x, y = y,
                                     size = Asteroid.LARGE)
             games.screen.add(new_asteroid)
+
+
+
+# create new alien
+        # calcualte an x and y at least BUFFER distance from the ship
+
+        #choose minimum distance along x-axis and y-axis
+        x_min = random.randrange(BUFFER)
+        y_min = BUFFER - x_min
+
+        # vhoose distance along x-axis and y-axis based on minimum distance
+        x_distance = random.randrange(x_min, games.screen.width - x_min)
+        y_distance = random.randrange(y_min, games.screen.height - y_min)
+
+        # calculate location based on distance
+        x = self.ship.x + x_distance
+        y = self.ship.y + y_distance
+
+        # wrap around screen, if necessary
+        x %= games.screen.width
+        y %= games.screen.height
+
+        # create the asteroid
+        new_alien = Alien(game = self,
+                                x = x, y = y)
+        games.screen.add(new_alien)
+
+
 
         # display level number
         level_message = games.Message(value = 'Level' + str(self.level),
